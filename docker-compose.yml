@@ -1,0 +1,83 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: superstash_db
+    environment:
+      POSTGRES_USER: saasuser
+      POSTGRES_PASSWORD: saaspass
+      POSTGRES_DB: saasdashboard
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U saasuser"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: superstash_redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: superstash_backend
+    command: npm run dev
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://saasuser:saaspass@postgres:5432/saasdashboard
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: development
+      PORT: 4000
+      JWT_SECRET: dev-secret-change-in-production
+
+  frontend:
+    build: ./frontend
+    container_name: superstash_frontend
+    command: npm run dev
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      VITE_API_URL: http://localhost:4000/api
+      VITE_WS_URL: ws://localhost:4000
+
+  node-project:
+    build: ./example-projects/node-project
+    container_name: node_example_project
+    command: npm run dev
+    ports:
+      - "5000:5000"
+
+  python-project:
+    build: ./example-projects/python-project
+    container_name: python_example_project
+    command: python server.py
+    ports:
+      - "6000:6000"
+
+volumes:
+  pgdata:
