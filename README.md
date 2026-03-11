@@ -1,0 +1,2 @@
+# Superstash
+Central Application Manager
