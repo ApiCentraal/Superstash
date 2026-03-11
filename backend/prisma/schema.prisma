@@ -1,0 +1,244 @@
+// Superstash Unified Dashboard - Database Schema
+// Dit schema definieert alle database models voor het centrale applicatiemanagement platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Project model - Centraal genormaliseerd project schema
+model Project {
+  id          String   @id @default(uuid())
+  name        String
+  type        ProjectType
+  status      ProjectStatus
+  repo        String?
+  lastBuild   DateTime?
+  tags        String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relaties
+  analytics   Analytics[]
+  payments    Payment[]
+  config      ProjectConfig?
+  team        Team?      @relation(fields: [teamId], references: [id])
+  teamId      String?
+  logs        AuditLog[]
+  
+  @@index([status])
+  @@index([type])
+  @@index([teamId])
+}
+
+enum ProjectType {
+  web
+  app
+  service
+}
+
+enum ProjectStatus {
+  live
+  staging
+  offline
+}
+
+// ProjectConfig model - Adapter configuratie per project
+model ProjectConfig {
+  id            String   @id @default(uuid())
+  projectId     String   @unique
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  adapterType   AdapterType
+  url           String?
+  endpoints     Json?    // { status: string, analytics: string, payments: string }
+  auth          Json?    // { type: string, credentials: string }
+  dbConfig      Json?    // { type: string, connectionString: string, query: string }
+  fieldMapping  Json?    // Record<string, string>
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+enum AdapterType {
+  node
+  python
+  php
+  rest
+  db
+}
+
+// Analytics model - Time-series analytics data per project
+model Analytics {
+  id          String   @id @default(uuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  users       Int      @default(0)
+  pageviews   Int      @default(0)
+  revenue     Float?
+  timestamp   DateTime @default(now())
+  
+  @@index([projectId, timestamp])
+}
+
+// Payment model - Betalingstransacties per project
+model Payment {
+  id            String   @id @default(uuid())
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  amount        Float
+  currency      String   @default("EUR")
+  provider      PaymentProvider
+  transactionId String   @unique
+  status        PaymentStatus
+  timestamp     DateTime @default(now())
+  
+  @@index([projectId, timestamp])
+  @@index([transactionId])
+}
+
+enum PaymentProvider {
+  stripe
+  paypal
+  square
+}
+
+enum PaymentStatus {
+  pending
+  completed
+  failed
+  refunded
+}
+
+// User model - Gebruikersaccounts met authenticatie
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String?
+  role          UserRole @default(viewer)
+  
+  // OAuth/SAML ondersteuning
+  oauthProvider String?
+  oauthId       String?
+  samlId        String?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relaties
+  teams         TeamMember[]
+  logs          AuditLog[]
+  
+  @@index([email])
+}
+
+enum UserRole {
+  admin
+  developer
+  viewer
+}
+
+// Team model - Team management voor multi-user support
+model Team {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relaties
+  members     TeamMember[]
+  projects    Project[]
+}
+
+// TeamMember model - Many-to-many relatie tussen Users en Teams
+model TeamMember {
+  id        String   @id @default(uuid())
+  teamId    String
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      TeamRole @default(member)
+  joinedAt  DateTime @default(now())
+  
+  @@unique([teamId, userId])
+  @@index([teamId])
+  @@index([userId])
+}
+
+enum TeamRole {
+  owner
+  admin
+  member
+}
+
+// AuditLog model - Audit trail voor alle acties
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  projectId   String?
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  
+  action      String   // bijv. "project.create", "project.update", "user.login"
+  method      String?  // HTTP method
+  endpoint    String?  // API endpoint
+  statusCode  Int?
+  changes     Json?    // Before/after voor updates
+  ipAddress   String?
+  userAgent   String?
+  
+  timestamp   DateTime @default(now())
+  
+  @@index([userId, timestamp])
+  @@index([projectId, timestamp])
+  @@index([action, timestamp])
+}
+
+// AggregatedAnalytics model - Geaggregeerde analytics over alle projecten
+model AggregatedAnalytics {
+  id          String   @id @default(uuid())
+  totalUsers  Int      @default(0)
+  totalPageviews Int   @default(0)
+  totalRevenue Float   @default(0)
+  timestamp   DateTime @default(now())
+  
+  @@index([timestamp])
+}
+
+// JobStatus model - Status tracking voor background jobs
+model JobStatus {
+  id          String   @id @default(uuid())
+  jobId       String   @unique
+  type        JobType
+  status      JobStatusEnum
+  attempts    Int      @default(0)
+  error       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  completedAt DateTime?
+  
+  @@index([status])
+  @@index([type])
+}
+
+enum JobType {
+  sync
+  analytics
+  payment
+  webhook
+}
+
+enum JobStatusEnum {
+  pending
+  processing
+  completed
+  failed
+  dead
+}
