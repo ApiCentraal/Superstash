@@ -20,17 +20,17 @@
     "@fastify/jwt": "^10.0.0",
     "@fastify/rate-limit": "^9.1.0",
     "@fastify/swagger": "^8.14.0",
-    "@fastify/swagger-ui": "^3.0.0",
+    "@fastify/swagger-ui": "^6.1.1",
     "@fastify/websocket": "^10.0.1",
     "@prisma/client": "^5.11.0",
-    "axios": "^1.6.7",
+    "axios": "^1.20.0",
     "bcrypt": "^6.0.0",
     "bullmq": "^5.4.2",
-    "fastify": "^5.8.2",
+    "fastify": "^5.12.5",
     "ioredis": "^5.3.2",
     "opossum": "^8.1.4",
     "winston": "^3.12.0",
-    "ws": "^8.16.0"
+    "ws": "^8.22.0"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
@@ -46,7 +46,7 @@
     "supertest": "^6.3.4",
     "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",
-    "tsx": "^4.7.1",
+    "tsx": "^4.23.15",
     "typescript": "^5.4.3"
   }
 }
